@@ -679,7 +679,7 @@ handler."
                     (when *headers-sent*
                       (setq *finish-processing-socket* t))
                     (throw 'handler-done
-                      (values nil cond (get-backtrace))))))
+                      (values nil (princ-to-string cond) (get-backtrace))))))
     (with-debugger
       (acceptor-dispatch-request *acceptor* *request*))))
 
