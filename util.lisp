@@ -56,7 +56,8 @@ digits."
 
 (defun reason-phrase (return-code)
   "Returns a reason phrase for the HTTP return code RETURN-CODE \(which
-should be an integer) or NIL for return codes Hunchentoot doesn't know."
+should be an integer) or the string \"No reason phrase known\" for
+return codes that are not in *HTTP-REASON-PHRASE-MAP*."
   (gethash return-code *http-reason-phrase-map* 
            "No reason phrase known"))
 
