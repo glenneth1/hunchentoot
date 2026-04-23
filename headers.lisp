@@ -76,7 +76,11 @@ no body is written to the client.  The handler function is expected to
 directly write to the stream in this case.
 
 Returns the stream that is connected to the client."
-  (let* ((chunkedp (and (acceptor-output-chunking-p *acceptor*)
+  (let* ((no-body-p (or (<= 100 return-code 199)
+                        (= return-code +http-no-content+)
+                        (= return-code +http-not-modified+)))
+         (chunkedp (and (not no-body-p)
+                        (acceptor-output-chunking-p *acceptor*)
                         (eq (server-protocol *request*) :http/1.1)
                         ;; only turn chunking on if the content
                         ;; length is unknown at this point...
@@ -84,6 +88,10 @@ Returns the stream that is connected to the client."
          (request-method (request-method *request*))
          (head-request-p (eq request-method :head))
          content-modified-p)
+    (when (and no-body-p content-provided-p content)
+      (log-message* :warning "Response body provided for status code ~D which must not have a body per RFC 7230. Discarding content." return-code)
+      (setq content nil
+            content-provided-p nil))
     (multiple-value-bind (keep-alive-p keep-alive-requested-p)
         (keep-alive-p *request*)
       (when keep-alive-p
@@ -131,7 +139,7 @@ Returns the stream that is connected to the client."
       (setf content (string-to-octets content :external-format (reply-external-format*))
             (content-type*) (maybe-add-charset-to-content-type-header (content-type*)
                                                                       (reply-external-format*))))
-    (when content
+    (when (and content (not no-body-p))
       ;; whenever we know what we're going to send out as content, set
       ;; the Content-Length header properly; maybe the user specified
       ;; a different content length, but that will wrong anyway
@@ -145,7 +153,7 @@ Returns the stream that is connected to the client."
                    return-code
                    :headers (headers-out*)
                    :cookies (cookies-out*)
-                   :content (unless head-request-p
+                   :content (unless (or head-request-p no-body-p)
                               content))
     ;; when processing a HEAD request, exit to return from PROCESS-REQUEST
     (when head-request-p
